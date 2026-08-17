@@ -77,6 +77,11 @@ class ProductAgentPolicyTests(unittest.TestCase):
             )
 
     def test_unapproved_cross_product_evidence_is_blocked(self) -> None:
+        with self.assertRaisesRegex(ProductAgentError, "boolean"):
+            EvidenceRef(
+                "invalid-approval",
+                approved_cross_product_standard="yes",  # type: ignore[arg-type]
+            )
         foreign = EvidenceRef("foreign-source", product_id="NEX-OTHER-001")
         with self.assertRaisesRegex(ProductAgentError, "cross-product"):
             self.agent.validate_state(
@@ -118,6 +123,10 @@ class ProductAgentPolicyTests(unittest.TestCase):
         )
 
     def test_invalid_schema_is_blocked(self) -> None:
+        with self.assertRaisesRegex(ProductAgentError, "version"):
+            state(version=1.5)
+        with self.assertRaisesRegex(ProductAgentError, "tuple"):
+            state(target_groups=[statement()])
         with self.assertRaisesRegex(ProductAgentError, "schema"):
             self.agent.validate_state(
                 state(schema="unknown_schema"), brief_approved=True
@@ -138,6 +147,10 @@ class ProductAgentPolicyTests(unittest.TestCase):
                 state(),
                 brief_approved=True,
                 estimated_cost_eur=Decimal("2.01"),
+            )
+        with self.assertRaisesRegex(ProductAgentError, "Decimal"):
+            self.agent.validate_state(
+                state(), brief_approved=True, estimated_cost_eur=2.0  # type: ignore[arg-type]
             )
         with self.assertRaisesRegex(ProductAgentError, "time"):
             self.agent.validate_state(
