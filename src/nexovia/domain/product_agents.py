@@ -45,10 +45,7 @@ class EvidenceRef:
             raise ProductAgentError("source_id cannot be blank")
 
     def is_allowed_for(self, product_id: str) -> bool:
-        return (
-            self.product_id in (None, product_id)
-            or self.approved_cross_product_standard
-        )
+        return self.product_id == product_id or self.approved_cross_product_standard
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +59,8 @@ class StrategyStatement:
     def __post_init__(self) -> None:
         if not self.statement_id.strip() or not self.text.strip():
             raise ProductAgentError("strategy statements require id and text")
+        if not isinstance(self.verification_status, VerificationStatus):
+            raise ProductAgentError("invalid verification status")
         if (
             self.verification_status is VerificationStatus.VERIFIED
             and not self.evidence
