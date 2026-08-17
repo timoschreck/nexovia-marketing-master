@@ -41,8 +41,14 @@ class EvidenceRef:
     approved_cross_product_standard: bool = False
 
     def __post_init__(self) -> None:
-        if not self.source_id.strip():
+        if not isinstance(self.source_id, str) or not self.source_id.strip():
             raise ProductAgentError("source_id cannot be blank")
+        if self.product_id is not None and (
+            not isinstance(self.product_id, str) or not self.product_id.strip()
+        ):
+            raise ProductAgentError("product_id must be a non-blank string")
+        if type(self.approved_cross_product_standard) is not bool:
+            raise ProductAgentError("cross-product approval must be boolean")
 
     def is_allowed_for(self, product_id: str) -> bool:
         return self.product_id == product_id or self.approved_cross_product_standard
@@ -57,10 +63,23 @@ class StrategyStatement:
     counterevidence: tuple[EvidenceRef, ...] = ()
 
     def __post_init__(self) -> None:
-        if not self.statement_id.strip() or not self.text.strip():
+        if (
+            not isinstance(self.statement_id, str)
+            or not self.statement_id.strip()
+            or not isinstance(self.text, str)
+            or not self.text.strip()
+        ):
             raise ProductAgentError("strategy statements require id and text")
         if not isinstance(self.verification_status, VerificationStatus):
             raise ProductAgentError("invalid verification status")
+        if not isinstance(self.evidence, tuple) or not all(
+            isinstance(item, EvidenceRef) for item in self.evidence
+        ):
+            raise ProductAgentError("evidence must be a tuple of EvidenceRef")
+        if not isinstance(self.counterevidence, tuple) or not all(
+            isinstance(item, EvidenceRef) for item in self.counterevidence
+        ):
+            raise ProductAgentError("counterevidence must be a tuple of EvidenceRef")
         if (
             self.verification_status is VerificationStatus.VERIFIED
             and not self.evidence
@@ -79,10 +98,28 @@ class ProductStrategyState:
     schema: str = PRODUCT_STRATEGY_SCHEMA
 
     def __post_init__(self) -> None:
-        if not self.product_id.strip() or not self.product_agent_id.strip():
+        if (
+            not isinstance(self.product_id, str)
+            or not self.product_id.strip()
+            or not isinstance(self.product_agent_id, str)
+            or not self.product_agent_id.strip()
+        ):
             raise ProductAgentError("product and agent ids cannot be blank")
-        if self.version < 1:
+        if type(self.version) is not int or self.version < 1:
             raise ProductAgentError("version must be positive")
+        if not isinstance(self.schema, str):
+            raise ProductAgentError("schema must be a string")
+        for name, values in (
+            ("characteristics", self.characteristics),
+            ("target_groups", self.target_groups),
+            ("marketing_strategies", self.marketing_strategies),
+        ):
+            if not isinstance(values, tuple) or not all(
+                isinstance(item, StrategyStatement) for item in values
+            ):
+                raise ProductAgentError(
+                    f"{name} must be a tuple of StrategyStatement"
+                )
 
     def statements(self) -> tuple[StrategyStatement, ...]:
         return self.characteristics + self.target_groups + self.marketing_strategies
@@ -96,8 +133,17 @@ class ProductAgent:
     timeout_seconds: int = 600
 
     def __post_init__(self) -> None:
-        if not self.agent_id.strip() or not self.product_id.strip():
+        if (
+            not isinstance(self.agent_id, str)
+            or not self.agent_id.strip()
+            or not isinstance(self.product_id, str)
+            or not self.product_id.strip()
+        ):
             raise ProductAgentError("agent and product ids cannot be blank")
+        if not isinstance(self.max_cost_eur, Decimal):
+            raise ProductAgentError("max_cost_eur must be Decimal")
+        if type(self.timeout_seconds) is not int:
+            raise ProductAgentError("timeout_seconds must be int")
         if self.max_cost_eur < 0 or self.timeout_seconds < 1:
             raise ProductAgentError("limits must be non-negative and non-zero")
 
@@ -117,6 +163,10 @@ class ProductAgent:
             raise ProductAgentError("product_id mismatch")
         if state.product_agent_id != self.agent_id:
             raise ProductAgentError("product_agent_id mismatch")
+        if not isinstance(estimated_cost_eur, Decimal):
+            raise ProductAgentError("estimated cost must be Decimal")
+        if type(elapsed_seconds) is not int:
+            raise ProductAgentError("elapsed seconds must be int")
         if estimated_cost_eur < 0 or estimated_cost_eur > self.max_cost_eur:
             raise ProductAgentError("cost limit reached")
         if elapsed_seconds < 0 or elapsed_seconds > self.timeout_seconds:
@@ -127,6 +177,8 @@ class ProductAgent:
                     raise ProductAgentError("unapproved cross-product evidence")
 
     def authorize(self, action: str) -> bool:
+        if not isinstance(action, str):
+            return False
         if action in HUMAN_ONLY_ACTIONS:
             return False
         return action in {"read_product_state", "propose_product_state"}
@@ -146,6 +198,8 @@ class ProductAgentRegistry:
         self._by_agent[agent.agent_id] = agent
 
     def require(self, product_id: str) -> ProductAgent:
+        if not isinstance(product_id, str) or not product_id.strip():
+            raise ProductAgentError("product_id must be a non-blank string")
         try:
             return self._by_product[product_id]
         except KeyError as exc:
