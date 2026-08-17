@@ -83,10 +83,32 @@ class ProductAgentPolicyTests(unittest.TestCase):
                 state(target_groups=(statement(evidence=(foreign,)),)),
                 brief_approved=True,
             )
+        unscoped = EvidenceRef("unscoped-source")
+        with self.assertRaisesRegex(ProductAgentError, "cross-product"):
+            self.agent.validate_state(
+                state(target_groups=(statement(evidence=(unscoped,)),)),
+                brief_approved=True,
+            )
+        approved_standard = EvidenceRef(
+            "approved-standard",
+            product_id="NEX-OTHER-001",
+            approved_cross_product_standard=True,
+        )
+        self.agent.validate_state(
+            state(target_groups=(statement(evidence=(approved_standard,)),)),
+            brief_approved=True,
+        )
 
     def test_unsubstantiated_statement_must_be_not_verified(self) -> None:
         with self.assertRaisesRegex(ProductAgentError, "require evidence"):
             statement(evidence=())
+        with self.assertRaisesRegex(ProductAgentError, "verification status"):
+            StrategyStatement(
+                statement_id="invalid-status",
+                text="Synthetic invalid status",
+                verification_status="verified",  # type: ignore[arg-type]
+                evidence=(),
+            )
         unverified = statement(
             status=VerificationStatus.NOT_VERIFIED,
             evidence=(),
