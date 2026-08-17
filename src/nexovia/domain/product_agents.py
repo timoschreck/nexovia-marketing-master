@@ -151,4 +151,3 @@ class ProductAgentRegistry:
             return self._by_product[product_id]
         except KeyError as exc:
             raise ProductAgentError("missing product agent") from exc
-
